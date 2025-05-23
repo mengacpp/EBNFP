@@ -3,5 +3,6 @@
 .ignore/
 .cache/
 build/
+ebnf/
 
 *.DS_Store

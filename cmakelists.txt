@@ -14,3 +14,5 @@ add_executable(ebnfp ${SOURCES})
 find_package(oxygen REQUIRED)
 
 target_link_libraries(ebnfp PRIVATE oxygen)
+
+target_include_directories(ebnfp PRIVATE ${CMAKE_SOURCE_DIR}/include)
