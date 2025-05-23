@@ -12,7 +12,7 @@ namespace analyser
 
 enum class ValidCharType
 {
-    Letter,       //: a-zA-z
+    Letter = 0,   //: a-zA-z
     DecimalDigit, //: 0-9
 
     Sym_QuoteFirst,  //: '
@@ -42,24 +42,59 @@ enum class ValidCharType
 
     OtherChar, //: :, +, _, %, @, &, #, $, <, >, \, ^, `, ~
 
-    SpaceChar,         //: ' ',
-    HorizontalTabChar, //: '\t',
-    NewLineChar,       //: '\n',
-    VerticalTabChar,   //: '\v',
-    FormFeed,          //: '\f',
+    SpaceChar = 90,         //: ' ',
+    HorizontalTabChar = 91, //: '\t',
+    NewLineChar = 92,       //: '\n',
+    VerticalTabChar = 93,   //: '\v',
+    FormFeed = 94,          //: '\f',
+    NaC = 100,              // not a character
 };
 
 struct ValidChar
 {
-    ValidChar(ValidCharType type, std::string value) : type(type), value(value)
+    ValidChar(ValidCharType type, std::string file_pos, std::string value)
+        : type(type), value(value), file_pos(file_pos)
     {
     }
-    ValidChar(ValidCharType type, char value)
-        : type(type), value(std::string() + value)
+    ValidChar(ValidCharType type, std::string file_pos, char value)
+        : type(type), value(std::string() + value), file_pos(file_pos)
     {
     }
     ValidCharType type;
     std::string value;
+    std::string file_pos;
+
+    inline bool operator==(const ValidChar &other) const
+    {
+        if (this->type != other.type)
+            return false;
+
+        if (this->type == ValidCharType::Letter)
+        {
+            if (this->value == other.value)
+                return true;
+
+            return false;
+        }
+
+        if (this->type == ValidCharType::DecimalDigit)
+        {
+            if (this->value == other.value)
+                return true;
+
+            return false;
+        }
+
+        if (this->type == ValidCharType::OtherChar)
+        {
+            if (this->value == other.value)
+                return true;
+
+            return false;
+        }
+
+        return true;
+    }
 };
 
 class CharsAnalyser

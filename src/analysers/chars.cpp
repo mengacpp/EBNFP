@@ -8,7 +8,8 @@ namespace analyser
 xgn::OutcomeOr<std::vector<ValidChar>> CharsAnalyser::analyse(std::string path)
 {
     std::vector<ValidChar> valid_chars;
-#define add_char(t, v) valid_chars.emplace_back(ValidCharType::t, v)
+#define add_char(t, v)                                                         \
+    valid_chars.emplace_back(ValidCharType::t, get_current_pos(), v)
 
     xgn::Outcome oc = start_analysis(path);
     if (!oc.is_ok())
@@ -241,13 +242,16 @@ std::string CharsAnalyser::get_current_pos()
 char CharsAnalyser::peek(int depth)
 {
     int target = m_current_char + depth;
-    if (target < 0 || target >= m_source.length())
+    if (target < 0 || target > m_source.length() - 1)
         return '\0';
 
     return m_source.at(target);
 }
 char CharsAnalyser::eat()
 {
+    if (m_current_char > m_source.size() - 1)
+        return '\0';
+
     char c = m_source.at(m_current_char++);
 
     if (c == '\n')

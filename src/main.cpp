@@ -1,4 +1,5 @@
 #include "analysers/chars.hpp"
+#include "analysers/symbols.hpp"
 #include "specifications.hpp"
 
 #include <iostream>
@@ -21,13 +22,15 @@ int main(int argc, char **argv)
             return 0;
     }
 
-    analyser::CharsAnalyser char_analyser;
+    analyser::CharsAnalyser chars_analyser;
+    analyser::SymbolsAnalyser symbols_analyser;
 
     std::vector<analyser::ValidChar> chars;
+    std::vector<analyser::Symbol> symbols;
 
     {
         auto oc =
-            char_analyser.analyse(specs.get_input_folder() + "chars.ebnf");
+            chars_analyser.analyse(specs.get_input_folder() + "chars.ebnf");
 
         if (!oc.is_ok())
         {
@@ -38,9 +41,21 @@ int main(int argc, char **argv)
         chars = *oc;
     }
 
-    for (auto c : chars)
     {
-        std::cout << c.value << "\n";
+        auto oc = symbols_analyser.analyse(chars);
+
+        if (!oc.is_ok())
+        {
+            std::cout << oc.outcome().fatal_message();
+            return 1;
+        }
+
+        symbols = *oc;
+    }
+
+    for (auto symbol : symbols)
+    {
+        std::cout << "'" << symbol.value << "'\n";
     }
 
     return 0;
