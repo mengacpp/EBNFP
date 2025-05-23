@@ -58,6 +58,12 @@ xgn::Outcome Specifications::generate(int argc, char **argv)
     if (m_output_folder.empty())
         m_output_folder = "ebnf/out/";
 
+    if (m_input_folder.at(m_input_folder.length() - 1) != '/')
+        m_input_folder.append("/");
+
+    if (m_output_folder.at(m_input_folder.length() - 1) != '/')
+        m_output_folder.append("/");
+
     xgn::Outcome oc = xgn::file::create_dirs(m_output_folder);
     oc.update(xgn::file::is_dir(m_input_folder));
     oc.update(xgn::file::is_dir(m_output_folder));
