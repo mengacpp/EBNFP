@@ -1,0 +1,7 @@
+### custom ###
+
+.ignore/
+.cache/
+build/
+
+*.DS_Store
