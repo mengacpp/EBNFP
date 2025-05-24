@@ -81,6 +81,8 @@ SymbolsAnalyser::remove_comments(std::vector<ValidChar> source)
     std::vector<ValidChar> old_source = m_source;
     int old_current = m_current_char;
 
+    // TODO change this
+    // not good to change private variables for a sub-function.
     m_current_char = 0;
     m_source = source;
 
