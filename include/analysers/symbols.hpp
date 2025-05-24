@@ -22,9 +22,6 @@ enum class SymbolType
     Except,              //: -
     Repetition,          //: *
 
-    CommentStart, //: (*
-    CommentEnd,   //: *)
-
     GroupStart, //: (
     GroupEnd,   //: )
 
@@ -45,7 +42,10 @@ enum class SymbolType
 
 struct Symbol
 {
-    Symbol(SymbolType type, std::string value) : type(type), value(value) {}
+    Symbol() : type(SymbolType::NaS), value("") {}
+    Symbol(SymbolType type, std::string value = "") : type(type), value(value)
+    {
+    }
     SymbolType type;
     std::string value;
 };
@@ -59,9 +59,15 @@ private:
     ValidChar peek(int depth = 0);
     ValidChar eat();
 
-    void clear_gap();
-    xgn::OutcomeOr<Symbol> try_get_symbol();
-    xgn::Outcome try_get_terminal_string(Symbol &out);
+    xgn::OutcomeOr<std::vector<ValidChar>>
+    remove_comments(std::vector<ValidChar> source);
+
+    xgn::Outcome remove_comment();
+    void remove_gap();
+
+    xgn::OutcomeOr<bool> try_get_symbol(Symbol &out);
+    xgn::OutcomeOr<bool> try_get_terminal_string(Symbol &out);
+
     bool is_terminal_char(ValidChar c);
 
     SymbolType chart_to_symbolt(ValidCharType ct);

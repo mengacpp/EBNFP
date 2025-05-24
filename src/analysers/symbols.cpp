@@ -1,3 +1,6 @@
+// TODO improve error messages:
+//  a) they are unclear
+//  b) if we need to print a special char (eg. \n) it gets treated as is.
 #include "analysers/symbols.hpp"
 
 namespace analyser
@@ -7,83 +10,107 @@ SymbolsAnalyser::analyse(std::vector<ValidChar> source)
 {
     std::vector<Symbol> symbols;
 
-    m_source = source;
+    // remove comments from source
+    {
+        xgn::OutcomeOr<std::vector<ValidChar>> oc = remove_comments(source);
+
+        if (!oc.is_ok())
+            return oc.outcome();
+
+        m_source = *oc;
+    }
+
     m_current_char = 0;
 
     while (peek().type != ValidCharType::NaC)
     {
-        clear_gap();
+        // make sure next char is a symbol
+        remove_gap();
 
         if (peek().type == ValidCharType::NaC)
             break;
 
+        // check if its a string
         {
-            Symbol string(SymbolType::NaS, "");
-            auto oc = try_get_terminal_string(string);
+            Symbol string;
+            xgn::OutcomeOr<bool> oc = try_get_terminal_string(string);
 
             if (!oc.is_ok())
             {
-                return oc;
+                return oc.outcome();
             }
 
-            if (!string.value.empty())
+            bool is_string = *oc;
+            if (is_string)
             {
                 symbols.push_back(string);
                 continue;
             }
         }
-        {
-            auto oc = try_get_symbol();
 
-            if (oc.is_ok())
+        // check if its another symbol
+        {
+            Symbol symbol;
+            auto oc = try_get_symbol(symbol);
+
+            if (!oc.is_ok())
             {
-                symbols.push_back((*oc));
+                return oc.outcome();
+            }
+
+            bool is_symbol = *oc;
+            if (is_symbol)
+            {
+                symbols.push_back(symbol);
                 continue;
             }
         }
 
-        // ERROR (shouldn't happen)
-        return xgn::Outcome("Invalid symbol '" + peek().value + "'");
+        // ERROR it's not a string nor a symbol
+        // this shouldn't really happen
+        return xgn::Outcome(peek().file_pos + ": Invalid symbol '" +
+                            peek().value + "'");
     }
 
     return symbols;
 }
 
-ValidChar SymbolsAnalyser::peek(int depth)
+xgn::OutcomeOr<std::vector<ValidChar>>
+SymbolsAnalyser::remove_comments(std::vector<ValidChar> source)
 {
-    int target = m_current_char + depth;
+    std::vector<ValidChar> old_source = m_source;
+    int old_current = m_current_char;
 
-    if (target < 0 || target > m_source.size() - 1)
-        return ValidChar(ValidCharType::NaC, "", '\0');
+    m_current_char = 0;
+    m_source = source;
 
-    return m_source.at(target);
-}
-ValidChar SymbolsAnalyser::eat()
-{
-    if (m_current_char > m_source.size() - 1)
-        return ValidChar(ValidCharType::NaC, "", '\0');
-
-    return m_source.at(m_current_char++);
-}
-
-void SymbolsAnalyser::clear_gap()
-{
+    std::vector<ValidChar> out;
     while (peek().type != ValidCharType::NaC)
     {
-        if (peek().type == ValidCharType::SpaceChar ||
-            peek().type == ValidCharType::HorizontalTabChar ||
-            peek().type == ValidCharType::VerticalTabChar ||
-            peek().type == ValidCharType::FormFeed ||
-            peek().type == ValidCharType::NewLineChar)
+        if (peek().type == ValidCharType::Sym_CommentStart)
         {
-            eat();
+            auto oc = remove_comment();
+
+            if (!oc.is_ok())
+                return oc;
             continue;
         }
+        else if (peek().type == ValidCharType::Sym_CommentEnd)
+        {
+            return xgn::Outcome(peek().file_pos + ": Invalid symbol '" +
+                                peek().value + "'");
+        }
 
-        break;
+        out.push_back(eat());
     }
+
+    m_source = old_source;
+    m_current_char = old_current;
+
+    return out;
 }
-xgn::OutcomeOr<Symbol> SymbolsAnalyser::try_get_symbol()
+
+xgn::OutcomeOr<bool> SymbolsAnalyser::try_get_symbol(Symbol &out)
 {
     if (is_terminal_char(peek()) &&
         (peek().type != ValidCharType::Sym_QuoteFirst &&
@@ -91,16 +118,17 @@ xgn::OutcomeOr<Symbol> SymbolsAnalyser::try_get_symbol()
     {
         SymbolType t = chart_to_symbolt(peek().type);
 
-        return Symbol(t, eat().value);
+        out = Symbol(t, eat().value);
+        return true;
     }
 
-    return xgn::Outcome("Not a symbol");
+    return false;
 }
-xgn::Outcome SymbolsAnalyser::try_get_terminal_string(Symbol &out)
+xgn::OutcomeOr<bool> SymbolsAnalyser::try_get_terminal_string(Symbol &out)
 {
     if (peek().type != ValidCharType::Sym_QuoteFirst &&
         peek().type != ValidCharType::Sym_QuoteSecond)
-        return xgn::Outcome::ok();
+        return false;
 
     ValidCharType delimiter_t = eat().type;
 
@@ -125,8 +153,63 @@ xgn::Outcome SymbolsAnalyser::try_get_terminal_string(Symbol &out)
     eat();
 
     out = Symbol(SymbolType::TerminalString, val);
+    return true;
+}
 
-    return xgn::Outcome::ok();
+xgn::Outcome SymbolsAnalyser::remove_comment()
+{
+    if (peek().type != ValidCharType::Sym_CommentStart)
+        return xgn::Outcome::ok();
+
+    std::string comment_pos = peek().file_pos;
+
+    while (peek().type != ValidCharType::NaC)
+    {
+        if (peek().type == ValidCharType::Sym_CommentEnd)
+        {
+            eat();
+            return xgn::Outcome::ok();
+        }
+        eat();
+    }
+
+    return xgn::Outcome(comment_pos + ": comment does not close");
+}
+
+void SymbolsAnalyser::remove_gap()
+{
+    while (peek().type != ValidCharType::NaC)
+    {
+        if (peek().type == ValidCharType::SpaceChar ||
+            peek().type == ValidCharType::HorizontalTabChar ||
+            peek().type == ValidCharType::VerticalTabChar ||
+            peek().type == ValidCharType::FormFeed ||
+            peek().type == ValidCharType::NewLineChar)
+        {
+            eat();
+            continue;
+        }
+
+        break;
+    }
+}
+
+ValidChar SymbolsAnalyser::peek(int depth)
+{
+    int target = m_current_char + depth;
+
+    if (target < 0 || target > m_source.size() - 1)
+        return ValidChar(ValidCharType::NaC, "", '\0');
+
+    return m_source.at(target);
+}
+
+ValidChar SymbolsAnalyser::eat()
+{
+    if (m_current_char > m_source.size() - 1)
+        return ValidChar(ValidCharType::NaC, "", '\0');
+
+    return m_source.at(m_current_char++);
 }
 
 bool SymbolsAnalyser::is_terminal_char(ValidChar c)
@@ -187,9 +270,9 @@ SymbolType SymbolsAnalyser::chart_to_symbolt(ValidCharType ct)
     case ValidCharType::Sym_Repetition:
         return SymbolType::Repetition;
     case ValidCharType::Sym_CommentStart:
-        return SymbolType::CommentStart;
+        return SymbolType::NaS;
     case ValidCharType::Sym_CommentEnd:
-        return SymbolType::CommentEnd;
+        return SymbolType::NaS;
     case ValidCharType::Sym_GroupStart:
         return SymbolType::GroupStart;
     case ValidCharType::Sym_GroupEnd:
